@@ -1,26 +1,21 @@
 import math
-import warnings
 from typing import TYPE_CHECKING, Optional
 
 import numpy as np
 
 import gym
-from gym import error, spaces
+from gym import spaces
 from gym.error import DependencyNotInstalled
-from gym.utils import EzPickle, colorize
-#from gym.utils.step_api_compatibility import step_api_compatibility
 
 try:
     import Box2D
     from Box2D.b2 import (
         circleShape,
-        contactListener,
-        edgeShape,
         fixtureDef,
         polygonShape,
         revoluteJointDef,
-        weldJointDef,
     )
+
 
 except ImportError:
     raise DependencyNotInstalled("box2d is not installed, run `pip install gym[box2d]`")
@@ -32,73 +27,28 @@ if TYPE_CHECKING:
 FPS = 60
 SCALE = 25.0  # affects how fast-paced the game is, forces should be adjusted as well
 
-MAIN_ENGINE_POWER = 13.0
-SIDE_ENGINE_POWER = 0.6
+#MAIN_ENGINE_POWER = 13.0
+#SIDE_ENGINE_POWER = 0.6
 
 INITIAL_RANDOM = 1000.0  # Set 1500 to make game harder
 
 
-"""MAP = [['o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o'],
+MAP = [['o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o'],
        ['o', 'o', 'o', 'o', 'w', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o'],
        ['e', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o'],
        ['o', 'o', 'o', 'o', 'w', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o'],
        ['o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'w', 'o', 'o', 'o', 'o', 'o'],
-       ['o', 'o', 'o', 'o', 'w', 'o', 'o', 'o', 'o', 'w', 'o', 'o', 'o', 'o', 'o'],
+       ['o', 'o', 'o', 'o', 'w', 'o', 'o', 'o', 'o', 'w', 'o', 'o', 'o', 'o', 's'],
        ['o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'w', 'o', 'o', 'o', 'o', 'o'],
        ['o', 'o', 'o', 'o', 'w', 'o', 'o', 'o', 'o', 'w', 'o', 'o', 'o', 'o', 'o'],
-       ['o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'w', 'o', 'o', 'o', 'o', 's'],
-       ['o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'w', 'o', 'o', 'o', 'o', 'o']]"""
+       ['o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'w', 'o', 'o', 'o', 'o', 'o'],
+       ['o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'w', 'o', 'o', 'o', 'o', 'o']]
 
-
-"""# Case 1
-MAP = [['o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o'],
-       ['o', 'o', 'o', 'o', 'o', 'o', 'o', 's', 'o', 'o', 'o', 'o', 'o', 'o', 'o'],
-       ['o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o'],
-       ['w', 'w', 'w', 'w', 'w', 'w', 'w', 'w', 'o', 'o', 'o', 'o', 'o', 'o', 'o'],
-       ['w', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o'],
-       ['w', 'o', 'e', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o'],
-       ['w', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o'],
-       ['w', 'w', 'w', 'w', 'w', 'w', 'w', 'w', 'o', 'o', 'o', 'o', 'o', 'o', 'o'],
-       ['o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o'],
-       ['o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o']]"""
-
-
-# Case 4
-MAP = [['o', 'o', 'o', 'o', 'o', 'o', 'w', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o'],
-       ['o', 'o', 'o', 'o', 'o', 'o', 'w', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o'],
-       ['o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o'],
-       ['o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o'],
-       ['o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o'],
-       ['e', 'o', 'o', 'o', 'o', 'o', 'w', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 's'],
-       ['o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o'],
-       ['o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o'],
-       ['o', 'o', 'o', 'o', 'o', 'o', 'w', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o'],
-       ['o', 'o', 'o', 'o', 'o', 'o', 'w', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o']]
 
 VIEWPORT_W = 1200
 VIEWPORT_H = 800
 
 BLOCK_SIZE = 1.0*VIEWPORT_H / len(MAP)
-
-
-#BOAT_POLY = [(-0, +12), (-10, 0), (-10, -20), (+10, -20), (+10, 0), (+0, +12)]
-
-#BOAT_POLY = [(-20, -20), (20, -20), (20, 0), (0, 20), (-20, 0)]
-
-"""BOAT_POLY = [(-12*BLOCK_SIZE/40, -20*BLOCK_SIZE/40), (12*BLOCK_SIZE/40, -20*BLOCK_SIZE/40),
-             (13.5*BLOCK_SIZE/40, -10*BLOCK_SIZE/40), (12*BLOCK_SIZE/40, 0*BLOCK_SIZE/40),
-             (7*BLOCK_SIZE/40, 10*BLOCK_SIZE/40), (2*BLOCK_SIZE/40, 15*BLOCK_SIZE/40),
-             (0*BLOCK_SIZE/40, 16*BLOCK_SIZE/40), (-2*BLOCK_SIZE/40, 15*BLOCK_SIZE/40),
-             (-7*BLOCK_SIZE/40, 10*BLOCK_SIZE/40), (-12*BLOCK_SIZE/40, 0*BLOCK_SIZE/40),
-             (-13.5*BLOCK_SIZE/40, -10*BLOCK_SIZE/40)]"""
-
-
-"""BOAT_POLY = [(-8*BLOCK_SIZE/40, -20*BLOCK_SIZE/40), (8*BLOCK_SIZE/40, -20*BLOCK_SIZE/40),
-             (8.5*BLOCK_SIZE/40, -10*BLOCK_SIZE/40), (8*BLOCK_SIZE/40, 0*BLOCK_SIZE/40),
-             (3*BLOCK_SIZE/40, 10*BLOCK_SIZE/40), (1*BLOCK_SIZE/40, 12*BLOCK_SIZE/40),
-             (0*BLOCK_SIZE/40, 13*BLOCK_SIZE/40), (-1*BLOCK_SIZE/40, 12*BLOCK_SIZE/40),
-             (-3*BLOCK_SIZE/40, 10*BLOCK_SIZE/40), (-8*BLOCK_SIZE/40, 0*BLOCK_SIZE/40),
-             (-8.5*BLOCK_SIZE/40, -10*BLOCK_SIZE/40)]"""
 
 
 BOAT_POLY = [(-6*BLOCK_SIZE/40, -20*BLOCK_SIZE/40), (6*BLOCK_SIZE/40, -20*BLOCK_SIZE/40),
@@ -113,18 +63,6 @@ BOAT_HOUSE_POLY = [(-4*BLOCK_SIZE/40, -7.5*BLOCK_SIZE/40), (4*BLOCK_SIZE/40, -7.
              (5*BLOCK_SIZE/40, -6.5*BLOCK_SIZE/40), (5*BLOCK_SIZE/40, 6.5*BLOCK_SIZE/40),
              (4*BLOCK_SIZE/40, 7.5*BLOCK_SIZE/40), (-4*BLOCK_SIZE/40, 7.5*BLOCK_SIZE/40),
              (-5*BLOCK_SIZE/40, 6.5*BLOCK_SIZE/40), (-5*BLOCK_SIZE/40, -6.5*BLOCK_SIZE/40)]
-
-
-
-#BOX_POLY = [(-20, +20), (20, 20), (20, -20), (-20, -20)]
-
-#COLOR_BLUE = (0, 114, 178)
-#COLOR_VERMILLION = (213, 94, 0)
-#COLOR_BLUEGREEN = (0, 158, 115)
-#COLOR_REDDISHPURPLE = (204, 121, 167)
-#COLOR_SKYBLUE = (86, 180, 233)
-#COLOR_ORANGE = (230, 159, 0)
-#COLOR_YELLOW = (240, 228, 66)
 
 COLOR_BLACK = (26, 28, 44)
 COLOR_PURPLE = (93, 39, 93)
@@ -166,16 +104,6 @@ boat_window.pos_rel_to_body = (0, 11/SCALE)
 
 
 
-
-
-
-
-
-
-
-
-
-
 class BoatNavi(gym.Env):
     """
         ### Description
@@ -195,10 +123,6 @@ class BoatNavi(gym.Env):
         ### Arguments
 
         ### Version History
-        - v2: Count energy spent and in v0.24, added turbulance with wind power and turbulence_power parameters
-        - v1: Legs contact with ground added in state vector; contact with ground
-            give +10 reward points, and -10 if then lose contact; reward
-            renormalized to 200; harder initial random push.
         - v0: Initial version
         <!-- ### References -->
         ### Credits
@@ -208,16 +132,14 @@ class BoatNavi(gym.Env):
     metadata = {
         "render_modes": ["human", "rgb_array"],
         "render_fps": FPS,
+        "observation_types": ["kinematic", "pixel", "both"]
     }
 
     def __init__(
             self,
             render_mode: Optional[str] = None,
-            continuous: bool = False,
-            gravity: float = -10.0,
-            enable_wind: bool = False,
-            wind_power: float = 15.0,
-            turbulence_power: float = 1.5,
+            observation_type: Optional[str] = "kinematic",
+
     ):
 
         self.screen: pygame.Surface = None
@@ -236,18 +158,36 @@ class BoatNavi(gym.Env):
         self.boat_position = None
 
         self.boat_draw_list = [boat_middle, boat_inner, boat_window]
+        self.debug_points = []
+
+        self.observation_type = observation_type
 
     def _destroy(self):
         self.world.DestroyBody(self.boat)
         self.boat = None
 
     def reset(self, initial_plan=None):
-        #super().reset(seed=seed)
-        #self._destroy()
-        #self.world.contactListener_keepref = ContactDetector(self)
-        #self.world.contactListener = self.world.contactListener_keepref
         self.game_over = False
         self.prev_shaping = None
+        self.map = np.zeros([len(MAP), len(MAP[0])])
+
+        for i in range(self.map.shape[0]):
+            for j in range(self.map.shape[1]):
+                # 0 = water
+                # 1 = obstacle
+                # 2 = goal
+                # 3 = boat
+
+                if MAP[i][j] == 'o':
+                    self.map[i][j] = 0
+
+                elif MAP[i][j] == 'w':
+                    self.map[i][j] = 1
+
+                elif MAP[i][j] == 'e':
+                    self.map[i][j] = 2
+
+
 
         self.plan = initial_plan
 
@@ -256,8 +196,8 @@ class BoatNavi(gym.Env):
 
         # ----------- Build map ----------- #
 
-        map_unit_w = VIEWPORT_W / SCALE / len(MAP[0])
-        map_unit_h = VIEWPORT_H / SCALE / len(MAP)
+        self.map_unit_w = VIEWPORT_W / SCALE / len(MAP[0])
+        self.map_unit_h = VIEWPORT_H / SCALE / len(MAP)
         map_list = []
 
         # Obstacles
@@ -268,7 +208,7 @@ class BoatNavi(gym.Env):
             for j in range(len(MAP[i])):
                 if MAP[i][j] == 'w':
                     end = self.world.CreateStaticBody(
-                        position=((0.5+j)*map_unit_w, (9.5-i)*map_unit_h),
+                        position=((0.5+j)*self.map_unit_w, (9.5-i)*self.map_unit_h),
                         shapes=polygonShape(box=(20*scaling/SCALE, 20*scaling/SCALE))
                     )
                     end.color1 = COLOR_ORANGE
@@ -276,20 +216,10 @@ class BoatNavi(gym.Env):
 
                     map_list.append(end)
 
-                    """if i+1 >= len(MAP):
-                        end = self.world.CreateStaticBody(
-                            position=((0.5+j)*map_unit_w, (9.5-i)*map_unit_h-13/SCALE),
-                            shapes=polygonShape(box=(20/SCALE, 7/SCALE))
-                        )
-                        end.color1 = COLOR_RED
-                        end.color2 = COLOR_BLACK
-
-                        map_list.append(end)"""
-
                     if i+1 >= len(MAP) or MAP[i+1][j] != 'w':
 
                         end = self.world.CreateStaticBody(
-                            position=((0.5+j)*map_unit_w, (9.5-i)*map_unit_h-13*scaling/SCALE),
+                            position=((0.5+j)*self.map_unit_w, (9.5-i)*self.map_unit_h-13*scaling/SCALE),
                             shapes=polygonShape(box=(20*scaling/SCALE, 7*scaling/SCALE))
                         )
                         end.color1 = COLOR_RED
@@ -297,18 +227,8 @@ class BoatNavi(gym.Env):
 
                         map_list.append(end)
 
-
-                    """end = self.world.CreateStaticBody(
-                        position=((0.5+j)*map_unit_w, (9.5-i)*map_unit_h),
-                        shapes=polygonShape(box=(2/SCALE, 2/SCALE))
-                    )
-                    end.color1 = COLOR_YELLOW
-                    end.color2 = COLOR_YELLOW
-
-                    map_list.append(end)"""
-
                 elif MAP[i][j] == 'e':
-                    self.end = ((0.5+j)*map_unit_w, (9.5-i)*map_unit_h)
+                    self.end = ((0.5+j)*self.map_unit_w, (9.5-i)*self.map_unit_h)
 
                     end = self.world.CreateStaticBody(
                         position=self.end,
@@ -321,7 +241,7 @@ class BoatNavi(gym.Env):
                     map_list.append(end)
 
                     end = self.world.CreateStaticBody(
-                        position=((0.5+j)*map_unit_w, (9.5-i)*map_unit_h-13*scaling/SCALE),
+                        position=((0.5+j)*self.map_unit_w, (9.5-i)*self.map_unit_h-13*scaling/SCALE),
                         shapes=polygonShape(box=(20*scaling/SCALE, 8*scaling/SCALE))
                     )
                     end.color1 = COLOR_LBLUE
@@ -332,7 +252,7 @@ class BoatNavi(gym.Env):
 
                 elif MAP[i][j] == 's':
 
-                    self.start = ((0.5+j)*map_unit_w, (9.5-i)*map_unit_h)
+                    self.start = ((0.5+j)*self.map_unit_w, (9.5-i)*self.map_unit_h)
                     break
 
                     end = self.world.CreateStaticBody(
@@ -346,7 +266,7 @@ class BoatNavi(gym.Env):
                     map_list.append(end)
 
                     end = self.world.CreateStaticBody(
-                        position=((0.5+j)*map_unit_w, (9.5-i)*map_unit_h-13*scaling/SCALE),
+                        position=((0.5+j)*self.map_unit_w, (9.5-i)*self.map_unit_h-13*scaling/SCALE),
                         shapes=polygonShape(box=(20*scaling/SCALE, 8*scaling/SCALE))
                     )
                     end.color1 = COLOR_GREEN
@@ -360,7 +280,7 @@ class BoatNavi(gym.Env):
 
         # Wall around
 
-        """grey_color = COLOR_BLACK
+        grey_color = COLOR_BLACK
 
         for i in range(2):
             wall = self.world.CreateStaticBody(
@@ -380,11 +300,11 @@ class BoatNavi(gym.Env):
             wall.color1 = grey_color
             wall.color2 = grey_color
 
-            map_list.append(wall)"""
+            map_list.append(wall)
 
         initial_x = self.start[0]
         initial_y = self.start[1]
-        initial_angle = 1.0*math.pi/2
+        initial_angle = math.pi/4
 
         boat_fixture_outer = fixtureDef(
                 shape=polygonShape(
@@ -409,7 +329,7 @@ class BoatNavi(gym.Env):
             angle=initial_angle,
             fixtures=boat_fixture_outer,
             angularDamping=1.5,
-            linearDamping=0.7,
+            linearDamping=0.5,
         )
 
         self.boat.color1 = COLOR_WHITE
@@ -454,10 +374,11 @@ class BoatNavi(gym.Env):
 
         return self.step(np.array([0.0]*self.action_space.shape[0]), plan=initial_plan)
 
-    def step(self, action, optional=0.0, plan=None):
+    def step(self, action, optional=0.0, plan=None, debug_points=[]):
         assert self.boat is not None, "You forgot to call reset()"
 
         self.plan = plan
+        self.debug_points = debug_points
 
         state = [None]
         reward = 0
@@ -482,6 +403,20 @@ class BoatNavi(gym.Env):
         self.boat.angle = optional #-math.atan2(action[0] - self.boat_position[0], action[1] - self.boat_position[1])
 
         self.boat_position = [self.boat.position.x, self.boat.position.y]"""
+
+        if self.observation_type == "pixel":
+            # 0 = water
+            # 1 = obstacle
+            # 2 = goal
+            # 3 = boat
+
+            state = np.copy(self.map)
+            #print()
+            x = math.floor(self.boat.position.x/self.map_unit_w)
+            y = 9-math.floor(self.boat.position.y/self.map_unit_h)
+            state[y][x] = 3
+
+
 
         return np.array(state, dtype=np.float32), reward, terminated, False, {}
 
@@ -568,6 +503,10 @@ class BoatNavi(gym.Env):
                 self.surf, color=color, points=arrow_head_coord, closed=True
             )"""
 
+        for debug_point in self.debug_points:
+            pygame.draw.circle(self.surf, COLOR_RED, debug_point*SCALE, 4)
+
+
 
 
 
@@ -584,41 +523,6 @@ class BoatNavi(gym.Env):
             return np.transpose(
                 np.array(pygame.surfarray.pixels3d(self.surf)), axes=(1, 0, 2)
             )
-
-    def spawn_obstacle_boat(self, coordinates, initial_impulse, initial_angle):
-
-        boat_fixture_outer = fixtureDef(
-            shape=polygonShape(
-                vertices=[(x * 1.2 / SCALE, y * 1.2 / SCALE) for x, y in BOAT_POLY]
-            ),
-            density=5.0,
-            friction=0.1,
-            categoryBits=0x0010,
-            maskBits=0x001,  # collide only with ground
-            restitution=0.1,
-        )
-
-        obstacle_boat: Box2D.b2Body = self.world.CreateDynamicBody(
-            position=(coordinates[0], coordinates[1]),
-            angle=initial_angle,
-            fixtures=boat_fixture_outer,
-            angularDamping=100000.0,
-            linearDamping=0.0,
-        )
-
-        obstacle_boat.color1 = COLOR_BLACK
-        obstacle_boat.color2 = COLOR_WHITE
-        obstacle_boat_list = obstacle_boat
-
-        forward_force = (-initial_impulse * math.sin(initial_angle), initial_impulse * math.cos(initial_angle))
-        obstacle_boat.ApplyLinearImpulse(
-            forward_force,
-            (self.boat.position.x, self.boat.position.y),
-            True,
-        )
-
-        self.drawlist.append(obstacle_boat_list)
-
 
 class LiftingAtan2:
 
@@ -648,9 +552,9 @@ if __name__ == '__main__':
     from scipy import interpolate
 
     #demo_ship(BoatNavi(render_mode="human"), render=True)
-    playing = False
+    playing = True
 
-    env = BoatNavi(render_mode="human")
+    env = BoatNavi(render_mode="human", observation_type='pixel')
 
     observation = env.reset()
 
@@ -684,16 +588,26 @@ if __name__ == '__main__':
                        [start_y, 20, 15, end_y]]).T
 
     points = np.array([[start_x, 30, 20, end_x],
-                       [start_y, 18, 16, end_y]]).T""" # ,
+                       [start_y, 18, 16, end_y]]).T"""
 
-    points = np.array([[start_x, 30, 26, 7.44249, end_x],
-                       [start_y, 12, 19.5, 20.0953, end_y]]).T  # a (nbre_points x nbre_dim) array
+    """points = np.array([[start_x, 30, 26, end_x],
+                       [start_y, 12, 20, end_y]]).T  # a (nbre_points x nbre_dim) array"""
+
+    """points = np.array([[start_x, 43.2, 37, 20, end_x],
+                       [start_y, 18, 29, 7, end_y]]).T  # a (nbre_points x nbre_dim) array"""
+
+    """points = np.array([[start_x, 43.2, 37, 20, end_x],
+                       [start_y, 18, 24, 7, end_y]]).T  # a (nbre_points x nbre_dim) array"""
+
+    points = np.array([[start_x, 36.8, 24, 11.2, end_x],
+                       [start_y, 22, 14.4, 6, end_y]]).T  # a (nbre_points x nbre_dim) array
+
 
     # Linear length along the line:
     distance = np.cumsum(np.sqrt(np.sum(np.diff(points, axis=0) ** 2, axis=1)))
     distance = np.insert(distance, 0, 0) / distance[-1]
 
-    alpha = np.linspace(0, 1, 1500)
+    alpha = np.linspace(0, 1, 1300)
 
     """interpolator = interpolate.interp1d(distance, points, kind='quadratic', axis=0)
     positions = interpolator(alpha)"""
@@ -703,18 +617,15 @@ if __name__ == '__main__':
     # Computed the spline for the asked distances:
     positions = np.vstack(spl(alpha) for spl in splines).T
 
+    points = np.array([[start_x, 36.8, 24, 11.2, end_x],
+                       [start_y, 22, 14.4, 23, end_y]]).T  # a (nbre_points x nbre_dim) array
 
-
-    # "fake path"
-
-    points = np.array([[start_x, 30, 26, end_x],
-                       [start_y, 11, 10, end_y]]).T  # a (nbre_points x nbre_dim) array
 
     # Linear length along the line:
     distance = np.cumsum(np.sqrt(np.sum(np.diff(points, axis=0) ** 2, axis=1)))
     distance = np.insert(distance, 0, 0) / distance[-1]
 
-    alpha = np.linspace(0, 1, 1500)
+    alpha = np.linspace(0, 1, 1300)
 
     """interpolator = interpolate.interp1d(distance, points, kind='quadratic', axis=0)
     positions = interpolator(alpha)"""
@@ -722,19 +633,7 @@ if __name__ == '__main__':
     # Build a list of the spline function, one for each dimension:
     splines = [interpolate.UnivariateSpline(distance, coords, k=2, s=.9) for coords in points.T]
     # Computed the spline for the asked distances:
-    fake_positions = np.vstack(spl(alpha) for spl in splines).T
-
-
-
-
-
-
-    #f = interpolate.interp1d(y, x, kind='cubic')
-    #f = interpolate.UnivariateSpline(y, x)
-    #xnew = np.linspace(end_y, start_y, 500)
-
-    #positions_old = np.array([[f(xnew[i]).item(), xnew[i]] for i in range(xnew.shape[0])])
-    #positions = np.array([[pos[0], pos[1]] for pos in interpolated_points])
+    other_positions = np.vstack(spl(alpha) for spl in splines).T
 
     angles = [-math.atan2(positions[1][0] - positions[0][0], positions[1][1] - positions[0][1])]
     velocities = []
@@ -789,39 +688,37 @@ if __name__ == '__main__':
             observation, reward, terminated, truncated, info = env.step(action*2)
             env.render()
 
-            print(env.boat.position)
+            print(observation)
             #print(action)
 
 
 
     else:
-        desired_speed = 2
+        desired_speed = 2.3
+        look_ahead = 40
         Kp_speed = 10
-        Kp_angle = 10
-        Kp_xte = 1
+        Kp_angle = 20
+        Kp_xte = 3.5
         desired_angle_hist = []
         curr_angle_hist = []
         import copy
 
-        num_points = 10
+        num_points = 5
 
         real_positions = []
 
-        test = 1
+        change_random_plan = 4
+        change_random_plan_i = 51
+
+        change_plan_until = 720
+        cos_limit = 0.5
+        rate_of_change = 0.06
 
 
-        obstacle_coord = [-22, 10]
-        obstacle_impulse = 90
-        obstacle_angle = -math.pi/2
-        env.spawn_obstacle_boat(obstacle_coord, obstacle_impulse, obstacle_angle)
-
-        for j in range(len(angles)):
+        for j in range(len(angles)+300):
             real_positions.append(np.array([env.boat.position.x, env.boat.position.y]))
 
-            #end_y = 14.4
             start_y = env.boat.position.y
-
-            #end_x = 8.0
             start_x = env.boat.position.x
 
             length_ahead = 0.5
@@ -829,24 +726,19 @@ if __name__ == '__main__':
             ahead_x = start_x - math.sin(env.boat.angle) * length_ahead
             ahead_y = start_y + math.cos(env.boat.angle) * length_ahead
 
-
-
-            #x = np.array([start_x, positions[j+diff_points][0], positions[j+2*diff_points][0], positions[j+200][0], end_x])
-            #y = np.array([start_y, positions[j+diff_points][1], positions[j+2*diff_points][1], positions[j+200][1], end_y])
-
-            start_change = 330
-            stop_change = start_change+10
-
             try:
-                if j < start_change:
-                    diff_points = (len(fake_positions) - j) // num_points
-                    x = [fake_positions[j + k * diff_points][0] for k in range(num_points)]
-                    y = [fake_positions[j + k * diff_points][1] for k in range(num_points)]
+                if change_plan_until > j:
+
+                    percentage_original_plan = min(cos_limit, max(math.cos(rate_of_change*j-math.pi/3), -cos_limit))+cos_limit
+
+                    """diff_points = (len(positions) - j) // num_points
+                    x = [positions[j + k * diff_points][0] for k in range(num_points)]
+                    y = [positions[j + k * diff_points][1] for k in range(num_points)]
                     x[0] = start_x
                     y[0] = start_y
 
-                    #x.insert(1, ahead_x)
-                    #y.insert(1, ahead_y)
+                    x.insert(1, ahead_x)
+                    y.insert(1, ahead_y)
                     # x[1] = ahead_x
                     # y[1] = ahead_y
                     x.append(end_x)
@@ -854,13 +746,14 @@ if __name__ == '__main__':
 
                     x = np.array(x)
                     y = np.array(y)
-                    k = 2
-                    print(j)
+                    k = 2"""
 
-                elif j < stop_change:
-                    diff_points = (len(fake_positions) - j) // num_points
-                    x = [fake_positions[j + k * diff_points][0] for k in range(num_points)]
-                    y = [fake_positions[j + k * diff_points][1] for k in range(num_points)]
+
+
+                    #new
+                    diff_points = (len(other_positions) - j) // num_points
+                    x = [other_positions[j + k * diff_points][0] for k in range(num_points)]
+                    y = [other_positions[j + k * diff_points][1] for k in range(num_points)]
                     x[0] = start_x
                     y[0] = start_y
 
@@ -882,23 +775,17 @@ if __name__ == '__main__':
 
                     x.insert(1, ahead_x)
                     y.insert(1, ahead_y)
-                    #x[1] = ahead_x
-                    #y[1] = ahead_y
+                    # x[1] = ahead_x
+                    # y[1] = ahead_y
                     x.append(end_x)
                     y.append(end_y)
 
                     x_real = np.array(x)
                     y_real = np.array(y)
-                    k=2
-                    a = np.array([[1, start_change], [1, stop_change]])
-                    b = np.array([0.0, 1.0])
-                    x0, x1 = np.linalg.solve(a, b)
+                    k = 2
 
-                    proportion = x0 + x1*j
-
-                    x = x_fake * (1-proportion) + x_real * (proportion)
-                    y = y_fake * (1 - proportion) + y_real * (proportion)
-
+                    x = x_fake * (1-percentage_original_plan) + x_real * (percentage_original_plan)
+                    y = y_fake * (1 - percentage_original_plan) + y_real * (percentage_original_plan)
 
 
                 else:
@@ -921,6 +808,8 @@ if __name__ == '__main__':
 
 
 
+
+
             except:
                 diff_points = (len(new_positions)) // num_points
                 x = [new_positions[k * diff_points][0] for k in range(num_points)]
@@ -937,6 +826,19 @@ if __name__ == '__main__':
                 y = np.array(y)
                 k = 2
                 # f = interpolate.interp1d(y, x, kind='cubic')
+
+            #y[2:-1] += [math.cos(j*0.3)*1 for i in range(num_points-1)]
+
+            std = 0.7
+
+            #y[2:-1] += np.random.normal(0, 0.2, y[2:-1].shape) + 0.5*np.cos(np.array([j*0.1]*(num_points-1)))
+
+            if j % change_random_plan == 0:
+                random_plan = np.random.uniform(-std, std, y[2:-1].shape) + 0.5 * np.cos(np.array([j * 0.1] * (num_points - 1)))
+
+            y[2:-1] += random_plan
+
+            change_random_plan_i += 1
 
             #xnew = np.linspace(end_y, start_y, 500)
 
@@ -956,30 +858,67 @@ if __name__ == '__main__':
             positions = interpolator(alpha)"""
 
             # Build a list of the spline function, one for each dimension:
-            splines = [interpolate.UnivariateSpline(distance, coords, k=k, s=.1) for coords in points.T]
+            splines = [interpolate.UnivariateSpline(distance, coords, k=k, s=1) for coords in points.T]
             # Computed the spline for the asked distances:
             new_positions = np.vstack(spl(alpha) for spl in splines).T
 
 
-            #observation, reward, terminated, truncated, info = env.step(positions[j], angles[j])
-            curr_speed = env.boat.linearVelocity.length
-            #print(curr_speed)
-            #desired_speed = velocities[j]*FPS
-            error_speed = desired_speed-curr_speed
-            curr_angle = env.boat.angle
-            desired_angle = angles[j]
-            desired_angle_hist.append(desired_angle)
-            curr_angle_hist.append(curr_angle)
-            error_angle = desired_angle-curr_angle
-
             #Calculate cross-track error
+            pos = new_positions
 
-            diff_pos = env.boat.position-positions
+
+            diff_pos = env.boat.position-pos
             ind_closest_point = np.argmin(np.linalg.norm(diff_pos, axis=1))
+            closest_point = pos[ind_closest_point]
             xte = np.linalg.norm(diff_pos[ind_closest_point])
 
-            distance_vector_angle = -math.atan2(diff_pos[ind_closest_point][1], diff_pos[ind_closest_point][0])-curr_angle
-            sign_xte = -math.copysign(1, distance_vector_angle)
+            test = diff_pos[ind_closest_point]
+
+            try:
+                forward_vector = pos[ind_closest_point + look_ahead] - pos[ind_closest_point]
+
+            except:
+                forward_vector = pos[-1] - pos[ind_closest_point]
+
+            desired_angle = -math.atan2(forward_vector[0], forward_vector[1])
+
+            """calc_boat_center = closest_point+diff_pos[ind_closest_point]
+
+            distance_vector_angle_prev = -math.atan2(diff_pos[ind_closest_point][0], diff_pos[ind_closest_point][1])-desired_angle
+
+            a = diff_pos[ind_closest_point]
+            b = forward_vector
+
+            inner = np.inner(a, b)
+            norms = np.linalg.norm(a) * np.linalg.norm(b)
+
+            cos = inner / norms
+            distance_vector_angle = np.arccos(cos)
+
+            sign_xte = -math.copysign(1, distance_vector_angle)"""
+
+
+            diff_pos_changed_frame = diff_pos[ind_closest_point] * np.array([math.cos(desired_angle), math.sin(desired_angle)])
+
+            sign_xte = math.copysign(1, diff_pos_changed_frame[0])
+
+
+            #Calculate PID stuff
+            curr_angle = env.boat.angle
+
+            curr_speed = env.boat.linearVelocity.length
+            # print(curr_speed)
+            # desired_speed = velocities[j]*FPS
+            error_speed = desired_speed - curr_speed
+            prev_desired_angle = angles[j]
+
+            #forward_vector = positions[ind_closest_point+1] - positions[ind_closest_point]
+
+            #desired_angle = -math.atan2(forward_vector[0], forward_vector[1])
+
+            desired_angle_hist.append(desired_angle)
+            curr_angle_hist.append(curr_angle)
+            error_angle = desired_angle - curr_angle
 
 
             if error_angle > 2:
@@ -990,7 +929,9 @@ if __name__ == '__main__':
             """plot_positions = copy.deepcopy(positions[j:])
             plot_positions[0] = env.boat.position"""
 
-            env.step([Kp_angle * error_angle + Kp_xte*sign_xte*xte, Kp_speed * error_speed], plan=new_positions)
+            env.step([Kp_angle * error_angle + Kp_xte*sign_xte*xte, Kp_speed * error_speed],
+                     plan=new_positions,
+                     debug_points=[closest_point])
 
 
 
@@ -1033,17 +974,6 @@ if __name__ == '__main__':
             new_positions = np.array([[f(xnew[i]).item(), xnew[i]] for i in range(xnew.shape[0])])"""
 
 
-            #observation, reward, terminated, truncated, info = env.step(positions[j], angles[j])
-            curr_speed = env.boat.linearVelocity.length
-            #print(curr_speed)
-            #desired_speed = velocities[j]*FPS
-            error_speed = desired_speed-curr_speed
-            curr_angle = env.boat.angle
-            desired_angle = angles[j]
-            desired_angle_hist.append(desired_angle)
-            curr_angle_hist.append(curr_angle)
-            error_angle = desired_angle-curr_angle
-
             #Calculate cross-track error
 
             diff_pos = env.boat.position-positions
@@ -1052,6 +982,24 @@ if __name__ == '__main__':
 
             distance_vector_angle = -math.atan2(diff_pos[ind_closest_point][1], diff_pos[ind_closest_point][0])-curr_angle
             sign_xte = -math.copysign(1, distance_vector_angle)
+
+
+            #Calculate PID stuff
+
+            curr_speed = env.boat.linearVelocity.length
+            # print(curr_speed)
+            # desired_speed = velocities[j]*FPS
+            error_speed = desired_speed - curr_speed
+            curr_angle = env.boat.angle
+            prev_desired_angle = angles[j]
+
+            forward_vector = positions[ind_closest_poin+4] - positions[ind_closest_point]
+
+            desired_angle = -math.atan2(forward_vector[1], forward_vector[0])
+
+            desired_angle_hist.append(desired_angle)
+            curr_angle_hist.append(curr_angle)
+            error_angle = desired_angle - curr_angle
 
 
             if error_angle > 2:
